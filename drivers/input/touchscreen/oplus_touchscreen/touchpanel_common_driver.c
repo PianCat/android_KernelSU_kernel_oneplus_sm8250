@@ -87,6 +87,8 @@ static int pm_qos_state = 0;
 #define PM_QOS_TOUCH_WAKEUP_VALUE 400
 #endif
 
+uint8_t DouTap_enable = 0;               // double tap
+
 static int sigle_num = 0;
 static struct timeval tpstart, tpend;
 static int pointx[2] = {0, 0};
@@ -511,6 +513,7 @@ int sec_double_tap(struct gesture_info *gesture)
 static void tp_gesture_handle(struct touchpanel_data *ts)
 {
 	struct gesture_info gesture_info_temp;
+	bool enabled = DouTap_enable;
 
 	if (!ts->ts_ops->get_gesture_info) {
 		TPD_INFO("not support ts->ts_ops->get_gesture_info callback\n");
@@ -565,7 +568,7 @@ static void tp_gesture_handle(struct touchpanel_data *ts)
 	}
 #endif // end of CONFIG_OPLUS_TP_APK
 
-	if (gesture_info_temp.gesture_type == DouTap && CHK_BIT(ts->gesture_enable_indep, (1 << gesture_info_temp.gesture_type))) {
+	if (gesture_info_temp.gesture_type == DouTap && CHK_BIT(ts->gesture_enable_indep, (1 << gesture_info_temp.gesture_type)) && enabled) {
 		memcpy(&ts->gesture, &gesture_info_temp, sizeof(struct gesture_info));
 
 		input_report_key(ts->input_dev, KEY_WAKEUP, 1);
@@ -1302,6 +1305,10 @@ static void tp_work_func(struct touchpanel_data *ts)
 			tp_pen_handle(ts);
 		}
 	} else if (CHK_BIT(cur_event, IRQ_GESTURE)) {
+	        if ((ts->gesture_enable_indep |= (1 << DouTap)))
+	                DouTap_enable = 1;
+	        else
+	                DouTap_enable = 0;
 		tp_gesture_handle(ts);
 	} else if (CHK_BIT(cur_event, IRQ_EXCEPTION)) {
 		tp_exception_handle(ts);
@@ -1790,6 +1797,8 @@ static ssize_t proc_gesture_control_write(struct file *file, const char __user *
 	if (ts->ts_ops->set_gesture_state)
 		ts->ts_ops->set_gesture_state(ts->chip_data, ts->gesture_enable_indep);
 	mutex_unlock(&ts->mutex);
+	
+	DouTap_enable = value > 0 ? 1 : 0;
 
 	return count;
 }
@@ -1797,7 +1806,6 @@ static ssize_t proc_gesture_control_write(struct file *file, const char __user *
 static ssize_t proc_gesture_control_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
 	int ret = 0;
-	int value = 0;
 	char page[PAGESIZE] = {0};
 	struct touchpanel_data *ts = PDE_DATA(file_inode(file));
 
@@ -1805,10 +1813,8 @@ static ssize_t proc_gesture_control_read(struct file *file, char __user *user_bu
 		return 0;
 	}
 
-	value = !!(ts->gesture_enable_indep & (1 << DouTap));
-
-	TPD_DEBUG("double tap enable is: %d\n", value);
-	ret = snprintf(page, PAGESIZE - 1, "%d", value);
+	TPD_DEBUG("double tap enable is: %d\n", DouTap_enable);
+	ret = snprintf(page, PAGESIZE - 1, "%d", DouTap_enable);
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 
 	return ret;
