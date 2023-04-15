@@ -1,0 +1,40 @@
+name: Sync kernel_oneplus_sm8250 repository
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每小时运行一次
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the target repository
+      uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.ACCESS_TOKEN }} # 用于访问目标仓库的个人访问令牌，需要在仓库设置中的Secrets中添加
+        repository: PianCat/android_KernelSU_kernel_oneplus_sm8250
+        path: target_repo
+
+    - name: Get the latest source repository commit
+      id: get_latest_commit
+      run: |
+        LATEST_COMMIT=$(curl -s https://api.github.com/repos/HELLBOY017/kernel_oneplus_sm8250/commits | jq -r '.[0].sha')
+        echo "Latest commit: $LATEST_COMMIT"
+        echo "::set-output name=latest_commit::$LATEST_COMMIT"
+        LATEST_BRANCH=$(curl -s https://api.github.com/repos/HELLBOY017/kernel_oneplus_sm8250/branches | jq -r '.[0].name')
+        echo "Latest branch: $LATEST_BRANCH"
+        echo "::set-output name=latest_branch::$LATEST_BRANCH"
+
+    - name: Sync the target repository with the source repository
+      run: |
+        cd target_repo
+        git remote add source_repo https://github.com/HELLBOY017/kernel_oneplus_sm8250.git
+        git fetch source_repo
+        LATEST_COMMIT="${{ steps.get_latest_commit.outputs.latest_commit }}"
+        LATEST_BRANCH="${{ steps.get_latest_commit.outputs.latest_branch }}"
+        echo "Latest commit: $LATEST_COMMIT"
+        echo "Latest branch: $LATEST_BRANCH"
+        git checkout $LATEST_BRANCH
+        git reset --hard $LATEST_COMMIT
+        git push origin $LATEST_BRANCH --force
