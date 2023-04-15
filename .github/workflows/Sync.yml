@@ -2,7 +2,7 @@ name: Sync kernel_oneplus_sm8250 repository
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每小时运行一次
+    - cron: '0 * * * *' # 每小时运行一次
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -21,18 +21,18 @@ jobs:
       run: |
         LATEST_COMMIT=$(curl -s https://api.github.com/repos/HELLBOY017/kernel_oneplus_sm8250/commits | jq -r '.[0].sha')
         echo "Latest commit: $LATEST_COMMIT"
-        echo "::set-output name=latest_commit::$LATEST_COMMIT"
+        echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_ENV
         LATEST_BRANCH=$(curl -s https://api.github.com/repos/HELLBOY017/kernel_oneplus_sm8250/branches | jq -r '.[0].name')
         echo "Latest branch: $LATEST_BRANCH"
-        echo "::set-output name=latest_branch::$LATEST_BRANCH"
+        echo "latest_branch=$LATEST_BRANCH" >> $GITHUB_ENV
 
     - name: Sync the target repository with the source repository
       run: |
         cd target_repo
         git remote add source_repo https://github.com/HELLBOY017/kernel_oneplus_sm8250.git
         git fetch source_repo
-        LATEST_COMMIT="${{ steps.get_latest_commit.outputs.latest_commit }}"
-        LATEST_BRANCH="${{ steps.get_latest_commit.outputs.latest_branch }}"
+        LATEST_COMMIT="${{ env.latest_commit }}"
+        LATEST_BRANCH="${{ env.latest_branch }}"
         echo "Latest commit: $LATEST_COMMIT"
         echo "Latest branch: $LATEST_BRANCH"
         git checkout $LATEST_BRANCH
